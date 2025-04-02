@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON格式化工具</title>
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        textarea, pre {
+            flex: 1;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            height: calc(100% - 20px);
+            resize: none;
+        }
+        pre {
+            background-color: #f5f5f5;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <textarea id="input" placeholder="在此粘贴您的JSON..."></textarea>
+    <pre id="output"></pre>
+
+    <script>
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+
+        function formatJSON(json) {
+            try {
+                const obj = JSON.parse(json);
+                const processedObj = processJSONStrings(obj);
+                return JSON.stringify(processedObj, null, 2);
+            } catch (error) {
+                return '无效的JSON格式';
+            }
+        }
+
+        function processJSONStrings(obj) {
+            for (const key in obj) {
+                if (typeof obj[key] === 'string') {
+                    try {
+                        obj[key] = JSON.parse(obj[key]);
+                    } catch (e) {
+                        // 如果不是有效的JSON字符串，保持原样
+                    }
+                } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    processJSONStrings(obj[key]);
+                }
+            }
+            return obj;
+        }
+
+        input.addEventListener('input', () => {
+            output.textContent = formatJSON(input.value);
+        });
+    </script>
+</body>
+</html>
