@@ -1,0 +1,83 @@
+<dependency>
+    <groupId>com.jcraft</groupId>
+    <artifactId>jsch</artifactId>
+    <version>0.1.55</version>
+</dependency>
+import com.jcraft.jsch.*;
+import java.io.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+public class ServerDeployment {
+
+    private static final String SERVER_IP = "192.168.1.188";
+    private static final String USERNAME = "your_username"; // 替换为你的用户名
+    private static final String PASSWORD = "your_password"; // 替换为你的密码
+    private static final String REMOTE_DIR = "/opt/vpms-server/models";
+    private static final String ZIP_FILE_PATH = "life-models.zip";
+    private static final String START_SCRIPT = "/opt/vpms-server/start.sh";
+
+    public static void main(String[] args) {
+        try {
+            JSch jsch = new JSch();
+            Session session = jsch.getSession(USERNAME, SERVER_IP, 22);
+            session.setPassword(PASSWORD);
+            session.setConfig("StrictHostKeyChecking", "no");
+            session.connect();
+
+            // 上传文件
+            uploadFile(session, ZIP_FILE_PATH, REMOTE_DIR);
+
+            // 删除旧文件夹
+            executeCommand(session, "rm -rf " + REMOTE_DIR + "/life-models");
+
+            // 解压缩文件
+            executeCommand(session, "unzip -o " + REMOTE_DIR + "/" + ZIP_FILE_PATH + " -d " + REMOTE_DIR);
+
+            // 终止8080端口的进程
+            executeCommand(session, "fuser -k 8080/tcp");
+
+            // 执行启动脚本
+            executeCommand(session, "sh " + START_SCRIPT);
+
+            session.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void uploadFile(Session session, String localFilePath, String remoteDir) throws Exception {
+        ChannelSftp sftpChannel = (ChannelSftp) session.openChannel("sftp");
+        sftpChannel.connect();
+        sftpChannel.put(new FileInputStream(localFilePath), remoteDir + "/" + new File(localFilePath).getName());
+        sftpChannel.disconnect();
+    }
+
+    private static void executeCommand(Session session, String command) throws Exception {
+        ChannelExec channelExec = (ChannelExec) session.openChannel("exec");
+        channelExec.setCommand(command);
+        channelExec.setInputStream(null);
+        channelExec.setErrStream(System.err);
+        InputStream in = channelExec.getInputStream();
+        channelExec.connect();
+
+        byte[] tmp = new byte[1024];
+        while (true) {
+            while (in.available() > 0) {
+                int i = in.read(tmp, 0, 1024);
+                if (i < 0) break;
+                System.out.print(new String(tmp, 0, i));
+            }
+            if (channelExec.isClosed()) {
+                System.out.println("exit-status: " + channelExec.getExitStatus());
+                break;
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (Exception ee) {
+                ee.printStackTrace();
+            }
+        }
+        channelExec.disconnect();
+    }
+}
