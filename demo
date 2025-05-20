@@ -1,3 +1,32 @@
+@Component
+public class CustomConfigPropertiesPrefixUpdater implements BeanFactoryPostProcessor {
+
+    private static final String TARGET_BEAN_NAME = "thirdPartyProperties"; // 替换为你实际的 bean name
+    private static final String NEW_PREFIX = "api-code";
+
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+        if (beanFactory.containsBean(TARGET_BEAN_NAME)) {
+            Object bean = beanFactory.getBean(TARGET_BEAN_NAME);
+
+            // 修改 @ConfigurationProperties 中的 prefix
+            ConfigurationProperties annotation = bean.getClass().getAnnotation(ConfigurationProperties.class);
+            if (annotation != null) {
+                try {
+                    Field prefixField = annotation.getClass().getDeclaredField("prefix");
+                    ReflectionUtils.makeAccessible(prefixField);
+                    ReflectionUtils.setField(prefixField, annotation, NEW_PREFIX);
+
+                    // 可选：手动触发一次绑定
+                    Binder binder = Binder.get(beanFactory);
+                    binder.bind(NEW_PREFIX, Bindable.ofInstance(bean));
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to update prefix for ConfigurationProperties", e);
+                }
+            }
+        }
+    }
+}
 <build>
     <plugins>
         <plugin>
